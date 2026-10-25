@@ -1,4 +1,4 @@
-# DECODE 3D Geothermal Explorer
+# Geothermal Explorer
 
 DECODE turns regional geological-model inputs into reservoir maps, an interactive 2D/3D browser, probabilistic geothermal screening outputs, and an adjustable doublet assessment.
 
@@ -70,8 +70,8 @@ PyThermoGIS is published on TNO's GitLab package index rather than public PyPI. 
 ### Installation
 
 ```powershell
-git clone https://github.com/floriansmit/decode3d.git
-cd decode3d
+git clone https://github.com/floriansmit/geothermal-explorer.git
+cd geothermal-explorer
 .\setup-local.cmd
 ```
 
