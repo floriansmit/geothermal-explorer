@@ -70,6 +70,7 @@ function defaults(point: Point | null, thermo: ThermoPoint | null = null): CalcI
 
 export default function Home() {
   const [workspace, setWorkspace] = useState<"demo" | "build">("demo");
+  const [dataset, setDataset] = useState<"denmark" | "estonia">("denmark");
   const [model, setModel] = useState<Model | null>(null);
   const [thermoModel, setThermoModel] = useState<ThermoModel | null>(null);
   const [culturalData, setCulturalData] = useState<CulturalData | null>(null);
@@ -215,20 +216,21 @@ export default function Home() {
   const mapPalette = showingThermo ? thermoProperties[thermoProperty].palette : properties[property].palette;
   const mapLabel = workflow === "market" ? "Heat-market context · PyThermoGIS P50" : showingThermo ? `${thermoProperties[thermoProperty].label} · P${percentile}` : properties[property].label;
   const mapUnit = showingThermo ? thermoProperties[thermoProperty].unit : properties[property].unit;
-  const supports3d = workflow === "geology" || workflow === "pythermogis";
-  const showing3d = supports3d && viewMode === "3d";
+  const supports3d = dataset === "estonia" || workflow === "geology" || workflow === "pythermogis";
+  const showing3d = dataset === "estonia" || (supports3d && viewMode === "3d");
 
   return <main className="app-shell">
     <header className="topbar">
       <div className="brand-mark"><Layers3 /></div><div><h1>DECODE</h1><p>Regional geothermal explorer</p></div>
       <div className="workspace-switch" role="group" aria-label="Workspace"><button className={workspace === "demo" ? "active" : ""} onClick={() => setWorkspace("demo")}><MapIcon /> Demo</button><button className={workspace === "build" ? "active" : ""} onClick={() => setWorkspace("build")}><Box /> Build Model</button></div>
-      <div className="topbar-status"><span className="status-dot" /> Well-conditioned first pass <span className="topbar-divider" /> EPSG:23032</div>
+      {workspace === "demo" && <div className="dataset-switch" role="group" aria-label="Dataset"><button className={dataset === "denmark" ? "active" : ""} onClick={() => setDataset("denmark")}>Denmark</button><button className={dataset === "estonia" ? "active" : ""} onClick={() => { setDataset("estonia"); setViewMode("3d"); }}>Estonia</button></div>}
+      <div className="topbar-status"><span className="status-dot" /> {dataset === "estonia" ? "PUMA Estonia architecture" : "Well-conditioned first pass"} <span className="topbar-divider" /> {dataset === "estonia" ? "Geographic WGS84" : "EPSG:23032"}</div>
     </header>
 
     {workspace === "build" ? <ModelBuilder /> : <>
 
     <aside className="control-panel">
-      <Tabs value={workflow} onValueChange={(value) => { const next = value as "geology" | "pythermogis" | "doublet" | "market"; setWorkflow(next); if (next === "doublet" || next === "market") setViewMode("2d"); if (next === "market") { setThermoProperty("power"); setPercentile(50); } }} className="sidebar-tabs">
+      {dataset === "estonia" ? <div className="estonia-panel"><section><p className="eyebrow">Second dataset</p><h2>Estonia PUMA model</h2><p className="panel-intro">Explore the supplied regional 3D architecture and horizontal hydraulic conductivity. Aquifers and aquitards follow the ATES Explorer stratigraphic interpretation.</p></section><div className="reservoir-card"><div className="reservoir-card-top"><Layers3 /><Badge variant="outline" className="model-badge">3D + Kh</Badge></div><strong>43 horizons · 42 intervals</strong><span>58 × 82 regional grid · 0 well trajectories</span></div><div className="notice"><Sigma /><p><strong>Hydrogeological classes</strong>Yellow marks porous aquifers, blue fractured carbonate aquifers, orange mixed packages and grey aquitards. Typical Kh values come directly from PUMA/MOSYS; porosity, net-to-gross, wells and PyThermoGIS outputs are not included.</p></div></div> : <Tabs value={workflow} onValueChange={(value) => { const next = value as "geology" | "pythermogis" | "doublet" | "market"; setWorkflow(next); if (next === "doublet" || next === "market") setViewMode("2d"); if (next === "market") { setThermoProperty("power"); setPercentile(50); } }} className="sidebar-tabs">
         <TabsList className="sidebar-tab-list"><TabsTrigger value="geology"><MapIcon /> Geology</TabsTrigger><TabsTrigger value="pythermogis"><Activity /> PyThermoGIS</TabsTrigger><TabsTrigger value="doublet"><Calculator /> DoubletCalc1D</TabsTrigger><TabsTrigger value="market"><Factory /> Heat market</TabsTrigger></TabsList>
         <TabsContent value="geology" className="sidebar-tab-content">
           <section><p className="eyebrow">Explore model</p><h2>Reservoir maps</h2><p className="panel-intro">Select an interval and cell. Topography and study wells keep the subsurface view geographically anchored.</p></section>
@@ -299,13 +301,13 @@ export default function Home() {
           </div>
           <div className="notice market-notice"><Sigma /><p><strong>Screening context</strong>Network delivery is a demand proxy—not building-level demand. Click facility symbols or network centres for source details.</p></div>
         </TabsContent>
-      </Tabs>
+      </Tabs>}
     </aside>
 
     <section className="map-panel" aria-label="Regional geothermal model map">
-      <div className="map-heading"><div><p>{reservoir?.name ?? "Loading model"}</p><h2>{showing3d ? workflow === "pythermogis" ? `3D ${thermoProperties[thermoProperty].label} · P${percentile}` : `3D ${properties[property].label}` : mapLabel}</h2></div>{supports3d ? <div className="view-mode-switch" role="group" aria-label="Viewer mode"><button className={viewMode === "2d" ? "active" : ""} onClick={() => setViewMode("2d")}><MapIcon /> 2D map</button><button className={viewMode === "3d" ? "active" : ""} onClick={() => setViewMode("3d")}><Box /> 3D model</button></div> : <Badge variant="outline" className="engine-badge">{thermoModel?.engine ?? "PyThermoGIS"} · P{percentile}</Badge>}<div className="coordinate-readout"><MapPin />{selected ? `${selected.lat.toFixed(4)}° N, ${selected.lon.toFixed(4)}° E` : "Select a grid cell"}</div></div>
+      <div className="map-heading"><div><p>{dataset === "estonia" ? "PUMA Estonia 2012" : reservoir?.name ?? "Loading model"}</p><h2>{dataset === "estonia" ? "3D hydrogeological architecture" : showing3d ? workflow === "pythermogis" ? `3D ${thermoProperties[thermoProperty].label} · P${percentile}` : `3D ${properties[property].label}` : mapLabel}</h2></div>{dataset === "estonia" ? <Badge variant="outline" className="engine-badge">Architecture + Kh</Badge> : supports3d ? <div className="view-mode-switch" role="group" aria-label="Viewer mode"><button className={viewMode === "2d" ? "active" : ""} onClick={() => setViewMode("2d")}><MapIcon /> 2D map</button><button className={viewMode === "3d" ? "active" : ""} onClick={() => setViewMode("3d")}><Box /> 3D model</button></div> : <Badge variant="outline" className="engine-badge">{thermoModel?.engine ?? "PyThermoGIS"} · P{percentile}</Badge>}<div className="coordinate-readout"><MapPin />{dataset === "estonia" ? "21.04–28.30° E · 57.41–60.03° N" : selected ? `${selected.lat.toFixed(4)}° N, ${selected.lon.toFixed(4)}° E` : "Select a grid cell"}</div></div>
       <div className="map-canvas">
-        {!showing3d ? <>{mapPoints && model ? <GeothermalMap points={mapPoints} wells={model.wells} selected={mapSelected} range={mapRange} property={mapProperty} palette={mapPalette} showBasemap={showTopography} focusLocation={focusLocation} cultural={workflow === "market" ? culturalData : null} showDistrictHeating={showDistrictHeating} showHeatDelivery={showHeatDelivery} showIndustry={showIndustry} showHeatPlants={showHeatPlants} onSelect={(point) => showingThermo ? selectThermoPoint(point as ThermoPoint) : selectPoint(point as Point)} /> : <div className="loading-state">Preparing regional model…</div>}
+        {dataset === "estonia" ? <Geology3DViewer architectureUrl="/data/architecture-3d-estonia.json" architectureOnly datasetLabel="Estonia PUMA model" /> : !showing3d ? <>{mapPoints && model ? <GeothermalMap points={mapPoints} wells={model.wells} selected={mapSelected} range={mapRange} property={mapProperty} palette={mapPalette} showBasemap={showTopography} focusLocation={focusLocation} cultural={workflow === "market" ? culturalData : null} showDistrictHeating={showDistrictHeating} showHeatDelivery={showHeatDelivery} showIndustry={showIndustry} showHeatPlants={showHeatPlants} onSelect={(point) => showingThermo ? selectThermoPoint(point as ThermoPoint) : selectPoint(point as Point)} /> : <div className="loading-state">Preparing regional model…</div>}
         <div className="address-search">
           <form onSubmit={searchAddress}><Search /><input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Search a Danish address or place" aria-label="Search a Danish address or place" /><button disabled={searching || address.trim().length < 3}>{searching ? <LoaderCircle className="search-spinner" /> : "Find"}</button></form>
           {(searchResults.length > 0 || searchMessage) && <div className="search-results">{searchResults.map((result) => <button key={`${result.lat}-${result.lon}`} onClick={() => chooseAddress(result)}><MapPin /><span>{result.display_name}</span></button>)}{searchMessage && <p>{searchMessage}</p>}<small>Search © OpenStreetMap contributors</small></div>}
@@ -316,12 +318,12 @@ export default function Home() {
       </div>
     </section>
 
-    <aside className="detail-panel">
+    {dataset === "estonia" ? <aside className="detail-panel estonia-detail"><div className="detail-header"><div className="detail-icon"><Layers3 /></div><div><p>Loaded dataset</p><h2>Estonia architecture</h2></div></div><div className="cell-summary"><p className="eyebrow">Model coverage</p><div className="metric-grid"><Metric label="Horizons" value="43" /><Metric label="Intervals" value="42" /><Metric label="Grid" value="58 × 82" /><Metric label="Wells" value="0" /></div></div><div className="notice"><Sigma /><p><strong>Property coverage</strong>Regional PUMA/MOSYS Kh is available per interval and grid cell. Supply porosity, net-to-gross and wells before adding Estonia PyThermoGIS and DoubletCalc1D runs.</p></div><footer><Activity /> puma-estonia-2012-export-v1</footer></aside> : <aside className="detail-panel">
       <div className="detail-header"><div className="detail-icon"><MapPin /></div><div><p>Selected location</p><h2>Reservoir stack</h2></div></div>
       <div className="stack-list">{showingThermo ? thermoStack.map(({ reservoir: item, point }) => <button key={item.id} className={`stack-row ${item.id === reservoirId ? "active" : ""}`} onClick={() => chooseReservoir(item.id)}><span className="depth-line" /><div className="stack-name"><strong>{item.name}</strong><span>PyThermoGIS · P{percentile}</span></div><div className="stack-value"><strong>{thermoFmt(point[activeThermoField], thermoProperty)}</strong><span>{thermoProperties[thermoProperty].unit}</span></div></button>) : stack.map(({ reservoir: item, point }) => <button key={item.id} className={`stack-row ${item.id === reservoirId ? "active" : ""}`} onClick={() => chooseReservoir(item.id)}><span className="depth-line" /><div className="stack-name"><strong>{item.name}</strong><span>{fmt(point.top_depth, "top_depth")} m bMSL</span></div><div className="stack-value"><strong>{fmt(point[property], property)}</strong><span>{properties[property].unit}</span></div></button>)}</div>
       {showingThermo && selectedThermo ? <div className="cell-summary"><p className="eyebrow">PyThermoGIS P{percentile} cell</p><div className="metric-grid"><Metric label="Power" value={`${thermoFmt(selectedThermo[thermoField("power", percentile)], "power")} MW`} /><Metric label="Flow" value={`${thermoFmt(selectedThermo[thermoField("flow_rate", percentile)], "flow_rate")} m³/h`} /><Metric label="Prod. temp" value={`${thermoFmt(selectedThermo[thermoField("prd_temp", percentile)], "prd_temp")} °C`} /><Metric label="Pressure" value={`${thermoFmt(selectedThermo[thermoField("pres", percentile)], "pres")} bar`} /><Metric label="Well spacing" value={`${thermoFmt(selectedThermo[thermoField("welld", percentile)], "welld")} m`} /><Metric label="CAPEX" value={`${thermoFmt(selectedThermo[thermoField("capex", percentile)], "capex")} M€`} /></div></div> : selected && <div className="cell-summary"><p className="eyebrow">Current cell</p><div className="metric-grid"><Metric label="Top" value={`${fmt(selected.top_depth, "top_depth")} m`} /><Metric label="Gross" value={`${fmt(selected.thickness_mean, "thickness_mean")} m`} /><Metric label="Net-to-gross" value={fmt(selected.ntg, "ntg")} /><Metric label="Porosity" value={fmt(selected.porosity, "porosity")} /><Metric label="Permeability" value={`${fmt(selected.permeability, "permeability")} mD`} /><Metric label="Temperature" value={`${fmt(selected.temperature, "temperature")} °C`} /><Metric label="Well support" value={`${Math.round(selected.well_support * 100)}%`} /></div></div>}
       <footer><Activity /> {model?.model_version ?? "Loading provenance"}</footer>
-    </aside>
+    </aside>}
     </>}
   </main>;
 }
