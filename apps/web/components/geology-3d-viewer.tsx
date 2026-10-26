@@ -28,6 +28,9 @@ const RESERVOIR_COLOURS: Record<string, string> = {
   bunter_sandstone: "#dcb43e",
 };
 
+const DEFAULT_VERTICAL_EXAGGERATION = 10;
+const KM_PER_DEGREE_LATITUDE = 111.32;
+
 export function Geology3DViewer({ reservoirs, dataReservoirs, activeId, selected, geometrySelected, property, propertyLabel, propertyUnit, digits, palette, fixedRange, dataModeLabel = "Geology", onSelect }:
   { reservoirs: Reservoir[]; dataReservoirs?: DataReservoir[]; activeId: string; selected: DataPoint | null; geometrySelected?: ModelPoint | null; property: string; propertyLabel: string; propertyUnit: string; digits: number; palette: string[]; fixedRange?: number[]; dataModeLabel?: string; onSelect: (point: DataPoint) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -39,7 +42,7 @@ export function Geology3DViewer({ reservoirs, dataReservoirs, activeId, selected
   const [yaw, setYaw] = useState(-.72);
   const [pitch, setPitch] = useState(-.5);
   const [zoom, setZoom] = useState(1);
-  const [verticalExaggeration, setVerticalExaggeration] = useState(1.8);
+  const [verticalExaggeration, setVerticalExaggeration] = useState(DEFAULT_VERTICAL_EXAGGERATION);
   const [showArchitecture, setShowArchitecture] = useState(true);
   const [showWells, setShowWells] = useState(true);
   const [showData, setShowData] = useState(true);
@@ -81,14 +84,20 @@ export function Geology3DViewer({ reservoirs, dataReservoirs, activeId, selected
     const { rows, cols, longitude, latitude } = architecture.grid;
     const minLon = Math.min(...longitude), maxLon = Math.max(...longitude), minLat = Math.min(...latitude), maxLat = Math.max(...latitude);
     const centreLon = (minLon + maxLon) / 2, centreLat = (minLat + maxLat) / 2;
-    const lonScale = 2 / (maxLon - minLon), latScale = 2 / (maxLat - minLat);
+    const kmPerDegreeLongitude = KM_PER_DEGREE_LATITUDE * Math.cos(centreLat * Math.PI / 180);
+    const widthKm = (maxLon - minLon) * kmPerDegreeLongitude;
+    const heightKm = (maxLat - minLat) * KM_PER_DEGREE_LATITUDE;
+    const horizontalHalfSpanKm = Math.max(widthKm, heightKm, 1) / 2;
+    const centreDepthM = (depthRange.min + depthRange.max) / 2;
     const cosYaw = Math.cos(yaw), sinYaw = Math.sin(yaw), cosPitch = Math.cos(pitch), sinPitch = Math.sin(pitch);
     const sceneScale = Math.min(size.width, size.height) * .35 * zoom;
     const toScreenCoordinate = (lon: number, lat: number, depth: number) => {
-      const x = (lon - centreLon) * lonScale;
-      const z = (lat - centreLat) * latScale * .72;
-      const normalDepth = (depth - depthRange.min) / Math.max(depthRange.max - depthRange.min, 1);
-      const y = .78 - normalDepth * 1.65 * verticalExaggeration;
+      // All three axes use the same kilometre-based world scale. This makes 1×
+      // a true, non-exaggerated geological view rather than a normalization of
+      // the full depth range to almost the full horizontal map width.
+      const x = (lon - centreLon) * kmPerDegreeLongitude / horizontalHalfSpanKm;
+      const z = (lat - centreLat) * KM_PER_DEGREE_LATITUDE / horizontalHalfSpanKm;
+      const y = -(depth - centreDepthM) / 1000 / horizontalHalfSpanKm * verticalExaggeration;
       const xr = x * cosYaw - z * sinYaw, zr = x * sinYaw + z * cosYaw;
       const yr = y * cosPitch - zr * sinPitch, cameraZ = y * sinPitch + zr * cosPitch;
       const perspective = 4.2 / (4.2 + cameraZ * .55);
@@ -199,7 +208,7 @@ export function Geology3DViewer({ reservoirs, dataReservoirs, activeId, selected
     }
   }, [architecture, size, yaw, pitch, zoom, verticalExaggeration, showArchitecture, showWells, showData, visible, activeId, selected, activeReservoir, activeDataReservoir, depthRange, horizonMap, property, palette, dataRange]);
 
-  const resetView = () => { setYaw(-.72); setPitch(-.5); setZoom(1); setVerticalExaggeration(1.8); };
+  const resetView = () => { setYaw(-.72); setPitch(-.5); setZoom(1); setVerticalExaggeration(DEFAULT_VERTICAL_EXAGGERATION); };
   const toggleReservoir = (id: string) => setVisible((current) => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next; });
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => { event.currentTarget.setPointerCapture(event.pointerId); drag.current = { x: event.clientX, y: event.clientY, moved: false }; };
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -233,7 +242,7 @@ export function Geology3DViewer({ reservoirs, dataReservoirs, activeId, selected
       <button className={showWells ? "enabled" : ""} onClick={() => setShowWells((value) => !value)}>{showWells ? <Eye /> : <EyeOff />}<i className="layer-swatch wells" /><span>Well trajectories<small>{architecture?.wells?.length ?? 0} deviation surveys</small></span></button>
       <button className={showData ? "enabled data-layer" : "data-layer"} onClick={() => setShowData((value) => !value)}>{showData ? <Eye /> : <EyeOff />}<i className="layer-swatch data" style={{ background: `linear-gradient(135deg,${palette.join(",")})` }} /><span>Active data surface<small>{propertyLabel} · {dataModeLabel}</small></span></button>
       {reservoirs.map((reservoir) => { const enabled = visible.has(reservoir.id), active = reservoir.id === activeId; return <button key={reservoir.id} className={`${enabled ? "enabled" : ""} ${active ? "active" : ""}`} onClick={() => toggleReservoir(reservoir.id)}>{enabled ? <Eye /> : <EyeOff />}<i className={`layer-swatch ${reservoir.id === "chalk_shallow" ? "chalk" : "reservoir"}`} /><span>{reservoir.name}<small>{active ? "Active reservoir" : "Reservoir"}</small></span></button>; })}
-      <label>Vertical exaggeration <strong>{verticalExaggeration.toFixed(1)}×</strong><input type="range" min="1" max="3" step=".1" value={verticalExaggeration} onChange={(event) => setVerticalExaggeration(Number(event.target.value))} /></label>
+      <label title="At 1×, horizontal distance and depth use the same physical scale.">Vertical exaggeration <strong>{verticalExaggeration.toFixed(0)}×</strong><input type="range" min="1" max="30" step="1" value={verticalExaggeration} onChange={(event) => setVerticalExaggeration(Number(event.target.value))} /><small>1× = true scale</small></label>
     </div>
     <div className="viewer-data">
       <p>{dataModeLabel} data surface</p><strong><i className="layer-swatch data" style={{ background: `linear-gradient(135deg,${palette.join(",")})` }} />{activeReservoir?.name}</strong>
