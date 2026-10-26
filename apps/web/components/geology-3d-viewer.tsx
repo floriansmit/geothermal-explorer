@@ -12,7 +12,7 @@ type Architecture = {
   model_version: string;
   grid: { rows: number; cols: number; longitude: number[]; latitude: number[] };
   horizons: Array<{ id: string; name: string; depths_m_bmsl: number[] }>;
-  intervals: Array<{ id: string; code?: string; name: string; top_horizon: string; base_horizon: string; kind: "reservoir" | "non_reservoir"; lithology?: "aquifer" | "carbonate" | "clay" | "mixed" | "other"; hydraulics?: "aquifer" | "aquitard" | "variable"; horizontal_hydraulic_conductivity_m_day?: Array<number | null> }>;
+  intervals: Array<{ id: string; name: string; top_horizon: string; base_horizon: string; kind: "reservoir" | "non_reservoir" }>;
   wells: WellTrajectory[];
 };
 type Face = { points: Array<{ x: number; y: number }>; depth: number; fill: string; stroke: string; lineWidth: number };
@@ -31,8 +31,8 @@ const RESERVOIR_COLOURS: Record<string, string> = {
 const DEFAULT_VERTICAL_EXAGGERATION = 10;
 const KM_PER_DEGREE_LATITUDE = 111.32;
 
-export function Geology3DViewer({ reservoirs = [], dataReservoirs, activeId = "", selected = null, geometrySelected, property = "", propertyLabel = "", propertyUnit = "", digits = 0, palette = ["#e8c84f", "#ffd85c"], fixedRange, dataModeLabel = "Geology", architectureUrl = "/data/architecture-3d.json", architectureOnly = false, datasetLabel = "Denmark", onSelect }:
-  { reservoirs?: Reservoir[]; dataReservoirs?: DataReservoir[]; activeId?: string; selected?: DataPoint | null; geometrySelected?: ModelPoint | null; property?: string; propertyLabel?: string; propertyUnit?: string; digits?: number; palette?: string[]; fixedRange?: number[]; dataModeLabel?: string; architectureUrl?: string; architectureOnly?: boolean; datasetLabel?: string; onSelect?: (point: DataPoint) => void }) {
+export function Geology3DViewer({ reservoirs, dataReservoirs, activeId, selected, geometrySelected, property, propertyLabel, propertyUnit, digits, palette, fixedRange, dataModeLabel = "Geology", onSelect }:
+  { reservoirs: Reservoir[]; dataReservoirs?: DataReservoir[]; activeId: string; selected: DataPoint | null; geometrySelected?: ModelPoint | null; property: string; propertyLabel: string; propertyUnit: string; digits: number; palette: string[]; fixedRange?: number[]; dataModeLabel?: string; onSelect: (point: DataPoint) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const drag = useRef<{ x: number; y: number; moved: boolean } | null>(null);
@@ -47,17 +47,9 @@ export function Geology3DViewer({ reservoirs = [], dataReservoirs, activeId = ""
   const [showWells, setShowWells] = useState(true);
   const [showData, setShowData] = useState(true);
   const [visible, setVisible] = useState<Set<string>>(() => new Set([activeId]));
-  const [selectedArchitectureKey, setSelectedArchitectureKey] = useState<string | null>(null);
 
-  useEffect(() => {
-    setArchitecture(null);
-    fetch(architectureUrl).then((response) => response.json() as Promise<Architecture>).then((next) => {
-      setArchitecture(next);
-      setVisible(architectureOnly && next.intervals.length ? new Set([`${next.intervals[0].id}-0`]) : new Set(activeId ? [activeId] : []));
-      setSelectedArchitectureKey(architectureOnly && next.intervals.length ? `${next.intervals[0].id}-0` : null);
-    });
-  }, [architectureUrl, architectureOnly]);
-  useEffect(() => { if (!architectureOnly && activeId) setVisible((current) => new Set([...current, activeId])); }, [activeId, architectureOnly]);
+  useEffect(() => { fetch("/data/architecture-3d.json").then((response) => response.json() as Promise<Architecture>).then(setArchitecture); }, []);
+  useEffect(() => { setVisible((current) => new Set([...current, activeId])); }, [activeId]);
   useEffect(() => {
     const element = containerRef.current;
     if (!element) return;
@@ -72,13 +64,6 @@ export function Geology3DViewer({ reservoirs = [], dataReservoirs, activeId = ""
     return [values[Math.floor(values.length * .03)] ?? 0, values[Math.floor(values.length * .97)] ?? 1];
   }, [activeDataReservoir, property]);
   const dataRange = fixedRange ?? calculatedRange;
-  const architectureIntervals = useMemo(() => architecture?.intervals.map((interval, index) => {
-    const values = interval.horizontal_hydraulic_conductivity_m_day?.filter((value): value is number => Number.isFinite(value))?.sort((a, b) => a - b) ?? [];
-    const typicalKh = values[Math.floor(values.length / 2)] ?? null;
-    const role = interval.kind === "non_reservoir" || interval.hydraulics === "aquitard" ? "Aquitard" : interval.lithology === "carbonate" ? "Fractured carbonate aquifer" : interval.lithology === "aquifer" ? "Porous aquifer" : "Variable aquifer package";
-    return { interval, key: `${interval.id}-${index}`, typicalKh, role };
-  }) ?? [], [architecture]);
-  const selectedArchitecture = architectureIntervals.find((item) => item.key === selectedArchitectureKey) ?? architectureIntervals[0];
   const horizonMap = useMemo(() => new Map(architecture?.horizons.map((item) => [item.id, item]) ?? []), [architecture]);
   const depthRange = useMemo(() => {
     if (!architecture) return { min: 0, max: 4000 };
@@ -126,16 +111,14 @@ export function Geology3DViewer({ reservoirs = [], dataReservoirs, activeId = ""
       faces.push({ points: projected, depth: projected.reduce((sum, point) => sum + point.z, 0) / projected.length, fill, stroke, lineWidth });
     };
     const stride = 2;
-    for (const [intervalIndex, interval] of architecture.intervals.entries()) {
+    for (const interval of architecture.intervals) {
       const isReservoir = interval.kind === "reservoir";
-      const key = architectureOnly ? `${interval.id}-${intervalIndex}` : interval.id;
-      if (architectureOnly && !visible.has(key)) continue;
-      if (!architectureOnly && isReservoir && !visible.has(interval.id)) continue;
-      if (!architectureOnly && !isReservoir && !showArchitecture) continue;
+      if (isReservoir && !visible.has(interval.id)) continue;
+      if (!isReservoir && !showArchitecture) continue;
       const top = horizonMap.get(interval.top_horizon)?.depths_m_bmsl, base = horizonMap.get(interval.base_horizon)?.depths_m_bmsl;
       if (!top || !base) continue;
-      const active = architectureOnly ? key === selectedArchitectureKey : interval.id === activeId;
-      const colour = !isReservoir ? "#87909a" : architectureOnly && interval.lithology === "carbonate" ? "#8fd3e8" : architectureOnly && interval.lithology === "mixed" ? "#e9a95f" : RESERVOIR_COLOURS[interval.id] ?? "#efd05a";
+      const active = interval.id === activeId;
+      const colour = isReservoir ? RESERVOIR_COLOURS[interval.id] ?? "#efd05a" : "#87909a";
       const alpha = isReservoir ? (active ? .76 : .48) : .16;
       const fill = hexToRgba(colour, alpha), stroke = active ? "rgba(255,247,196,.78)" : isReservoir ? "rgba(52,48,31,.45)" : "rgba(205,211,216,.18)";
       const dataPoints = active && showData ? activeDataReservoir?.points : null;
@@ -215,7 +198,7 @@ export function Geology3DViewer({ reservoirs = [], dataReservoirs, activeId = ""
       }
     }
 
-    const activeInterval = architectureOnly ? undefined : architecture.intervals.find((item) => item.id === activeId);
+    const activeInterval = architecture.intervals.find((item) => item.id === activeId);
     const activeTop = activeInterval && visible.has(activeId) ? horizonMap.get(activeInterval.top_horizon)?.depths_m_bmsl : null;
     hitPoints.current = activeTop ? activeTop.map((depth, index) => ({ ...toScreen(index, depth), index })) : [];
     if (selected && activeDataReservoir) {
@@ -223,12 +206,12 @@ export function Geology3DViewer({ reservoirs = [], dataReservoirs, activeId = ""
       const hit = hitPoints.current[selectedIndex];
       if (hit) { context.beginPath(); context.arc(hit.x, hit.y, 7, 0, Math.PI * 2); context.fillStyle = "#11151c"; context.fill(); context.strokeStyle = "#fff4b6"; context.lineWidth = 2.5; context.stroke(); }
     }
-  }, [architecture, architectureOnly, selectedArchitectureKey, size, yaw, pitch, zoom, verticalExaggeration, showArchitecture, showWells, showData, visible, activeId, selected, activeReservoir, activeDataReservoir, depthRange, horizonMap, property, palette, dataRange]);
+  }, [architecture, size, yaw, pitch, zoom, verticalExaggeration, showArchitecture, showWells, showData, visible, activeId, selected, activeReservoir, activeDataReservoir, depthRange, horizonMap, property, palette, dataRange]);
 
   const resetView = () => { setYaw(-.72); setPitch(-.5); setZoom(1); setVerticalExaggeration(DEFAULT_VERTICAL_EXAGGERATION); };
   const toggleReservoir = (id: string) => setVisible((current) => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next; });
   const showAllLayers = () => {
-    setVisible(new Set(architectureOnly ? architectureIntervals.map((item) => item.key) : reservoirs.map((reservoir) => reservoir.id)));
+    setVisible(new Set(reservoirs.map((reservoir) => reservoir.id)));
     setShowArchitecture(true);
     setShowWells(true);
     setShowData(true);
@@ -252,7 +235,7 @@ export function Geology3DViewer({ reservoirs = [], dataReservoirs, activeId = ""
       const rect = event.currentTarget.getBoundingClientRect(), x = event.clientX - rect.left, y = event.clientY - rect.top;
       let nearest: { x: number; y: number; index: number } | null = null, distance = Infinity;
       for (const point of hitPoints.current) { const value = Math.hypot(point.x - x, point.y - y); if (value < distance) { nearest = point; distance = value; } }
-      if (nearest && distance < 22 && activeDataReservoir.points[nearest.index]) onSelect?.(activeDataReservoir.points[nearest.index]);
+      if (nearest && distance < 22 && activeDataReservoir.points[nearest.index]) onSelect(activeDataReservoir.points[nearest.index]);
     }
     drag.current = null;
   };
@@ -261,29 +244,25 @@ export function Geology3DViewer({ reservoirs = [], dataReservoirs, activeId = ""
   return <div ref={containerRef} className="viewer-3d">
     <canvas ref={canvasRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={() => { drag.current = null; }} onWheel={(event) => { event.preventDefault(); setZoom((value) => Math.max(.45, Math.min(2.8, value * (event.deltaY < 0 ? 1.1 : .9)))); }} aria-label="Interactive 3D geological architecture viewer" />
     {!architecture && <div className="viewer-loading"><Box /> Loading 3D horizons…</div>}
-    <div className="viewer-instructions">{architectureOnly ? "Drag to rotate · Scroll to zoom · Toggle intervals for inspection" : "Drag to rotate · Scroll to zoom · Click the active surface to inspect"}</div>
+    <div className="viewer-instructions">Drag to rotate · Scroll to zoom · Click the active surface to inspect</div>
     <div className="viewer-toolbar">
       <button onClick={() => setZoom((value) => Math.min(2.8, value * 1.15))}>+</button><button onClick={() => setZoom((value) => Math.max(.45, value / 1.15))}>−</button><button className="top-view" onClick={() => { setYaw(0); setPitch(-Math.PI / 2); }} title="Top view">TOP</button><button onClick={resetView} title="Reset 3D view"><RotateCcw /></button>
     </div>
     <div className="viewer-layers">
       <div className="viewer-layers-heading"><span><Layers3 /> Layers</span><span className="viewer-layer-actions"><button onClick={showAllLayers} title="Show all layers">Show all</button><button onClick={showNoLayers} title="Hide all layers">Show none</button></span></div>
-      {!architectureOnly && <button className={showArchitecture ? "enabled" : ""} onClick={() => setShowArchitecture((value) => !value)}>{showArchitecture ? <Eye /> : <EyeOff />}<i className="layer-swatch architecture" /><span>Non-reservoir architecture<small>Grey intervals</small></span></button>}
-      {(architecture?.wells?.length ?? 0) > 0 && <button className={showWells ? "enabled" : ""} onClick={() => setShowWells((value) => !value)}>{showWells ? <Eye /> : <EyeOff />}<i className="layer-swatch wells" /><span>Well trajectories<small>{architecture?.wells?.length ?? 0} deviation surveys</small></span></button>}
-      {!architectureOnly && <button className={showData ? "enabled data-layer" : "data-layer"} onClick={() => setShowData((value) => !value)}>{showData ? <Eye /> : <EyeOff />}<i className="layer-swatch data" style={{ background: `linear-gradient(135deg,${palette.join(",")})` }} /><span>Active data surface<small>{propertyLabel} · {dataModeLabel}</small></span></button>}
-      {architectureOnly ? architectureIntervals.map(({ interval, key, typicalKh, role }) => { const enabled = visible.has(key), active = key === selectedArchitectureKey; const swatch = interval.kind === "non_reservoir" ? "#87909a" : interval.lithology === "carbonate" ? "#8fd3e8" : interval.lithology === "mixed" ? "#e9a95f" : "#efd05a"; return <button key={key} className={`${enabled ? "enabled" : ""} ${active ? "active" : ""}`} onClick={() => { if (active) toggleReservoir(key); else { setSelectedArchitectureKey(key); setVisible((current) => new Set([...current, key])); } }}>{enabled ? <Eye /> : <EyeOff />}<i className="layer-swatch" style={{ background: swatch }} /><span>{cleanUnitName(interval.name)}<small>{role} · Kh {formatKh(typicalKh)} m/day</small></span></button>; }) : reservoirs.map((reservoir) => { const enabled = visible.has(reservoir.id), active = reservoir.id === activeId; return <button key={reservoir.id} className={`${enabled ? "enabled" : ""} ${active ? "active" : ""}`} onClick={() => toggleReservoir(reservoir.id)}>{enabled ? <Eye /> : <EyeOff />}<i className={`layer-swatch ${reservoir.id === "chalk_shallow" ? "chalk" : "reservoir"}`} /><span>{reservoir.name}<small>{active ? "Active reservoir" : "Reservoir"}</small></span></button>; })}
+      <button className={showArchitecture ? "enabled" : ""} onClick={() => setShowArchitecture((value) => !value)}>{showArchitecture ? <Eye /> : <EyeOff />}<i className="layer-swatch architecture" /><span>Non-reservoir architecture<small>Grey intervals</small></span></button>
+      <button className={showWells ? "enabled" : ""} onClick={() => setShowWells((value) => !value)}>{showWells ? <Eye /> : <EyeOff />}<i className="layer-swatch wells" /><span>Well trajectories<small>{architecture?.wells?.length ?? 0} deviation surveys</small></span></button>
+      <button className={showData ? "enabled data-layer" : "data-layer"} onClick={() => setShowData((value) => !value)}>{showData ? <Eye /> : <EyeOff />}<i className="layer-swatch data" style={{ background: `linear-gradient(135deg,${palette.join(",")})` }} /><span>Active data surface<small>{propertyLabel} · {dataModeLabel}</small></span></button>
+      {reservoirs.map((reservoir) => { const enabled = visible.has(reservoir.id), active = reservoir.id === activeId; return <button key={reservoir.id} className={`${enabled ? "enabled" : ""} ${active ? "active" : ""}`} onClick={() => toggleReservoir(reservoir.id)}>{enabled ? <Eye /> : <EyeOff />}<i className={`layer-swatch ${reservoir.id === "chalk_shallow" ? "chalk" : "reservoir"}`} /><span>{reservoir.name}<small>{active ? "Active reservoir" : "Reservoir"}</small></span></button>; })}
       <label title="At 1×, horizontal distance and depth use the same physical scale.">Vertical exaggeration <strong>{verticalExaggeration.toFixed(0)}×</strong><input type="range" min="1" max="30" step="1" value={verticalExaggeration} onChange={(event) => setVerticalExaggeration(Number(event.target.value))} /><small>1× = true scale</small></label>
     </div>
-    {architectureOnly ? <div className="viewer-data architecture-summary">
-      <p>{datasetLabel}</p><strong><i className="layer-swatch" style={{ background: selectedArchitecture?.interval.kind === "non_reservoir" ? "#87909a" : selectedArchitecture?.interval.lithology === "carbonate" ? "#8fd3e8" : selectedArchitecture?.interval.lithology === "mixed" ? "#e9a95f" : "#efd05a" }} />{cleanUnitName(selectedArchitecture?.interval.name ?? "Architecture")}</strong>
-      <div><span>Hydrogeological role</span><b>{selectedArchitecture?.role ?? "—"}</b></div><div><span>Typical model Kh</span><b>{formatKh(selectedArchitecture?.typicalKh ?? null)} <small>m/day</small></b></div><div><span>Model code</span><b>{selectedArchitecture?.interval.code ?? "—"}</b></div>
-      <small>Yellow = porous aquifer · blue = fractured carbonate aquifer · orange = mixed/variable · grey = aquitard. Kh is the regional PUMA/MOSYS model value, not a site test.</small>
-    </div> : <div className="viewer-data">
+    <div className="viewer-data">
       <p>{dataModeLabel} data surface</p><strong><i className="layer-swatch data" style={{ background: `linear-gradient(135deg,${palette.join(",")})` }} />{activeReservoir?.name}</strong>
       <div><span>{propertyLabel}</span><b>{selectedValue == null ? "—" : selectedValue.toLocaleString("en-GB", { minimumFractionDigits: digits, maximumFractionDigits: digits })} <small>{propertyUnit}</small></b></div>
       <div><span>Top depth</span><b>{geometrySelected?.top_depth.toFixed(0) ?? (selected?.top_depth?.toFixed(0) || "—")} <small>m bMSL</small></b></div>
       <div><span>Gross thickness</span><b>{geometrySelected?.thickness_mean.toFixed(0) ?? (selected?.thickness_mean?.toFixed(0) || "—")} <small>m</small></b></div>
       <div className="viewer-data-ramp"><i style={{ background: `linear-gradient(90deg,${palette.join(",")})` }} /><span>{dataRange[0].toLocaleString("en-GB", { maximumFractionDigits: digits })}</span><span>{dataRange[1].toLocaleString("en-GB", { maximumFractionDigits: digits })} {propertyUnit}</span>{fixedRange && <small>Fixed P10–P90 scale</small>}</div>
-    </div>}
+    </div>
     <div className="viewer-scale"><span>MSL</span><i /><span>{Math.round(depthRange.max).toLocaleString("en-GB")} m bMSL</span></div>
   </div>;
 }
@@ -299,13 +278,4 @@ function colourRamp(palette: string[], value: number, alpha: number) {
   const b = palette[index + 1].match(/\w\w/g)!.map((part) => parseInt(part, 16));
   const rgb = a.map((channel, offset) => Math.round(channel + (b[offset] - channel) * local));
   return `rgba(${rgb.join(",")},${alpha})`;
-}
-
-function formatKh(value: number | null) {
-  if (value == null) return "—";
-  return value >= .01 ? value.toLocaleString("en-GB", { maximumFractionDigits: 3 }) : value.toExponential(0);
-}
-
-function cleanUnitName(value: string) {
-  return value.replaceAll("â€“", "–").replaceAll("Å¡", "š").replaceAll("Ä¼", "ļ").replaceAll("Å†", "ņ").replaceAll("Ã¼", "ü").replaceAll("Å¾", "ž").replaceAll("Ã¤", "ä").replaceAll("Å™", "ř").replaceAll("Ã­", "í");
 }
