@@ -53,7 +53,7 @@ export function Geology3DViewer({ reservoirs = [], dataReservoirs, activeId = ""
     setArchitecture(null);
     fetch(architectureUrl).then((response) => response.json() as Promise<Architecture>).then((next) => {
       setArchitecture(next);
-      setVisible(architectureOnly ? new Set(next.intervals.map((interval, index) => `${interval.id}-${index}`)) : new Set(activeId ? [activeId] : []));
+      setVisible(architectureOnly && next.intervals.length ? new Set([`${next.intervals[0].id}-0`]) : new Set(activeId ? [activeId] : []));
       setSelectedArchitectureKey(architectureOnly && next.intervals.length ? `${next.intervals[0].id}-0` : null);
     });
   }, [architectureUrl, architectureOnly]);
@@ -227,6 +227,18 @@ export function Geology3DViewer({ reservoirs = [], dataReservoirs, activeId = ""
 
   const resetView = () => { setYaw(-.72); setPitch(-.5); setZoom(1); setVerticalExaggeration(DEFAULT_VERTICAL_EXAGGERATION); };
   const toggleReservoir = (id: string) => setVisible((current) => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  const showAllLayers = () => {
+    setVisible(new Set(architectureOnly ? architectureIntervals.map((item) => item.key) : reservoirs.map((reservoir) => reservoir.id)));
+    setShowArchitecture(true);
+    setShowWells(true);
+    setShowData(true);
+  };
+  const showNoLayers = () => {
+    setVisible(new Set());
+    setShowArchitecture(false);
+    setShowWells(false);
+    setShowData(false);
+  };
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => { event.currentTarget.setPointerCapture(event.pointerId); drag.current = { x: event.clientX, y: event.clientY, moved: false }; };
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (!drag.current) return;
@@ -254,7 +266,7 @@ export function Geology3DViewer({ reservoirs = [], dataReservoirs, activeId = ""
       <button onClick={() => setZoom((value) => Math.min(2.8, value * 1.15))}>+</button><button onClick={() => setZoom((value) => Math.max(.45, value / 1.15))}>−</button><button className="top-view" onClick={() => { setYaw(0); setPitch(-Math.PI / 2); }} title="Top view">TOP</button><button onClick={resetView} title="Reset 3D view"><RotateCcw /></button>
     </div>
     <div className="viewer-layers">
-      <div><span><Layers3 /> Layers</span><small>Multiple selection</small></div>
+      <div className="viewer-layers-heading"><span><Layers3 /> Layers</span><span className="viewer-layer-actions"><button onClick={showAllLayers} title="Show all layers">Show all</button><button onClick={showNoLayers} title="Hide all layers">Show none</button></span></div>
       {!architectureOnly && <button className={showArchitecture ? "enabled" : ""} onClick={() => setShowArchitecture((value) => !value)}>{showArchitecture ? <Eye /> : <EyeOff />}<i className="layer-swatch architecture" /><span>Non-reservoir architecture<small>Grey intervals</small></span></button>}
       {(architecture?.wells?.length ?? 0) > 0 && <button className={showWells ? "enabled" : ""} onClick={() => setShowWells((value) => !value)}>{showWells ? <Eye /> : <EyeOff />}<i className="layer-swatch wells" /><span>Well trajectories<small>{architecture?.wells?.length ?? 0} deviation surveys</small></span></button>}
       {!architectureOnly && <button className={showData ? "enabled data-layer" : "data-layer"} onClick={() => setShowData((value) => !value)}>{showData ? <Eye /> : <EyeOff />}<i className="layer-swatch data" style={{ background: `linear-gradient(135deg,${palette.join(",")})` }} /><span>Active data surface<small>{propertyLabel} · {dataModeLabel}</small></span></button>}
