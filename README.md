@@ -147,3 +147,22 @@ See [Architecture](docs/architecture.md) for details.
 ## Licensing and data rights
 
 No licence is granted for third-party geological deliveries, well data, cultural datasets, or PyThermoGIS by this repository. Confirm the applicable licences before publishing derived data or deploying the calculation engine. See [NOTICE.md](NOTICE.md).
+
+## Local doublet simulation
+
+In **Demo → DoubletCalc1D**, select a deep-reservoir cell on the map and choose **Create local doublet model**. The geology and adjusted doublet inputs initialise a uniform single-layer grid centred on that location. The domain width and cell size are independent of the regional map spacing. Azimuth is clockwise from north from injector to producer. Compare schedules with all other settings held fixed. The hosted example replays three real 30-year open-DARTS runs at the same Gassum site (56.864221° N, 10.081209° E), on a 100 × 100 grid with 50 m cells and 1.2 km well spacing.
+
+For custom runs, start the existing local website and launch the optional solver in a separate terminal from the repository root. Use a separate Python 3.12 environment for DARTS and its scientific dependencies:
+
+    uv venv --python 3.12 .venv-doublet
+    uv pip install --python .venv-doublet -r apps/doublet/requirements.txt
+
+On Windows run:
+
+    .venv-doublet\Scripts\python -m uvicorn apps.doublet.server:app --host 127.0.0.1 --port 8001
+
+On Linux run:
+
+    .venv-doublet/bin/python -m uvicorn apps.doublet.server:app --host 127.0.0.1 --port 8001
+
+Each run uses an isolated worker and temporary output directory. Cold-front maps are saved annually. Well pressure, temperature and achieved rate are integrated over solver time steps. Heat sales are capped by the editable demand assumption. Discounted operating cash flows use year-end discounting and upfront CAPEX. Wellbore/surface losses, brine salinity, vertical heat recharge and sub-grid heterogeneity are outside this first screening case. The independent DoubletCalc2D benchmark is pending.
