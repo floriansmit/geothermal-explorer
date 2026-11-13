@@ -46,6 +46,7 @@ export function Geology3DViewer({ reservoirs, dataReservoirs, activeId, selected
   const [showArchitecture, setShowArchitecture] = useState(true);
   const [showWells, setShowWells] = useState(true);
   const [showData, setShowData] = useState(true);
+  const [layersExpanded, setLayersExpanded] = useState(false);
   const [visible, setVisible] = useState<Set<string>>(() => new Set([activeId]));
 
   useEffect(() => { fetch("/data/architecture-3d.json").then((response) => response.json() as Promise<Architecture>).then(setArchitecture); }, []);
@@ -248,13 +249,16 @@ export function Geology3DViewer({ reservoirs, dataReservoirs, activeId, selected
     <div className="viewer-toolbar">
       <button onClick={() => setZoom((value) => Math.min(2.8, value * 1.15))}>+</button><button onClick={() => setZoom((value) => Math.max(.45, value / 1.15))}>−</button><button className="top-view" onClick={() => { setYaw(0); setPitch(-Math.PI / 2); }} title="Top view">TOP</button><button onClick={resetView} title="Reset 3D view"><RotateCcw /></button>
     </div>
-    <div className="viewer-layers">
-      <div className="viewer-layers-heading"><span><Layers3 /> Layers</span><span className="viewer-layer-actions"><button onClick={showAllLayers} title="Show all layers">Show all</button><button onClick={showNoLayers} title="Hide all layers">Show none</button></span></div>
-      <button className={showArchitecture ? "enabled" : ""} onClick={() => setShowArchitecture((value) => !value)}>{showArchitecture ? <Eye /> : <EyeOff />}<i className="layer-swatch architecture" /><span>Non-reservoir architecture<small>Grey intervals</small></span></button>
-      <button className={showWells ? "enabled" : ""} onClick={() => setShowWells((value) => !value)}>{showWells ? <Eye /> : <EyeOff />}<i className="layer-swatch wells" /><span>Well trajectories<small>{architecture?.wells?.length ?? 0} deviation surveys</small></span></button>
-      <button className={showData ? "enabled data-layer" : "data-layer"} onClick={() => setShowData((value) => !value)}>{showData ? <Eye /> : <EyeOff />}<i className="layer-swatch data" style={{ background: `linear-gradient(135deg,${palette.join(",")})` }} /><span>Active data surface<small>{propertyLabel} · {dataModeLabel}</small></span></button>
-      {reservoirs.map((reservoir) => { const enabled = visible.has(reservoir.id), active = reservoir.id === activeId; return <button key={reservoir.id} className={`${enabled ? "enabled" : ""} ${active ? "active" : ""}`} onClick={() => toggleReservoir(reservoir.id)}>{enabled ? <Eye /> : <EyeOff />}<i className={`layer-swatch ${reservoir.id === "chalk_shallow" ? "chalk" : "reservoir"}`} /><span>{reservoir.name}<small>{active ? "Active reservoir" : "Reservoir"}</small></span></button>; })}
-      <label title="At 1×, horizontal distance and depth use the same physical scale.">Vertical exaggeration <strong>{verticalExaggeration.toFixed(0)}×</strong><input type="range" min="1" max="30" step="1" value={verticalExaggeration} onChange={(event) => setVerticalExaggeration(Number(event.target.value))} /><small>1× = true scale</small></label>
+    <div className={`viewer-layers ${layersExpanded ? "expanded" : ""}`}>
+      <button className="layers-toggle" type="button" aria-controls="geology-3d-layers-content" aria-expanded={layersExpanded} onClick={() => setLayersExpanded((value) => !value)}><span><Layers3 /> Layers</span><i aria-hidden="true">▾</i></button>
+      <div id="geology-3d-layers-content" className="viewer-layers-content">
+        <div className="viewer-layers-heading"><span><Layers3 /> Layers</span><span className="viewer-layer-actions"><button onClick={showAllLayers} title="Show all layers">Show all</button><button onClick={showNoLayers} title="Hide all layers">Show none</button></span></div>
+        <button className={showArchitecture ? "enabled" : ""} onClick={() => setShowArchitecture((value) => !value)}>{showArchitecture ? <Eye /> : <EyeOff />}<i className="layer-swatch architecture" /><span>Non-reservoir architecture<small>Grey intervals</small></span></button>
+        <button className={showWells ? "enabled" : ""} onClick={() => setShowWells((value) => !value)}>{showWells ? <Eye /> : <EyeOff />}<i className="layer-swatch wells" /><span>Well trajectories<small>{architecture?.wells?.length ?? 0} deviation surveys</small></span></button>
+        <button className={showData ? "enabled data-layer" : "data-layer"} onClick={() => setShowData((value) => !value)}>{showData ? <Eye /> : <EyeOff />}<i className="layer-swatch data" style={{ background: `linear-gradient(135deg,${palette.join(",")})` }} /><span>Active data surface<small>{propertyLabel} · {dataModeLabel}</small></span></button>
+        {reservoirs.map((reservoir) => { const enabled = visible.has(reservoir.id), active = reservoir.id === activeId; return <button key={reservoir.id} className={`${enabled ? "enabled" : ""} ${active ? "active" : ""}`} onClick={() => toggleReservoir(reservoir.id)}>{enabled ? <Eye /> : <EyeOff />}<i className={`layer-swatch ${reservoir.id === "chalk_shallow" ? "chalk" : "reservoir"}`} /><span>{reservoir.name}<small>{active ? "Active reservoir" : "Reservoir"}</small></span></button>; })}
+        <label title="At 1×, horizontal distance and depth use the same physical scale.">Vertical exaggeration <strong>{verticalExaggeration.toFixed(0)}×</strong><input type="range" min="1" max="30" step="1" value={verticalExaggeration} onChange={(event) => setVerticalExaggeration(Number(event.target.value))} /><small>1× = true scale</small></label>
+      </div>
     </div>
     <div className="viewer-data">
       <p>{dataModeLabel} data surface</p><strong><i className="layer-swatch data" style={{ background: `linear-gradient(135deg,${palette.join(",")})` }} />{activeReservoir?.name}</strong>
