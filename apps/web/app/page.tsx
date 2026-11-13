@@ -220,6 +220,7 @@ export default function Home() {
 
   return <main className="app-shell">
     <header className="topbar">
+      <a className="ggs-return" href="https://www.greengrowthscientific.com/" aria-label="Return to the Green Growth Scientific website">← GGS site</a>
       <div className="brand-mark"><Layers3 /></div><div><h1>DECODE</h1><p>Regional geothermal explorer</p></div>
       <div className="workspace-switch" role="group" aria-label="Workspace"><button className={workspace === "demo" ? "active" : ""} onClick={() => setWorkspace("demo")}><MapIcon /> Demo</button><button className={workspace === "build" ? "active" : ""} onClick={() => setWorkspace("build")}><Box /> Build Model</button></div>
       <div className="topbar-status"><span className="status-dot" /> Well-conditioned first pass <span className="topbar-divider" /> EPSG:23032</div>
