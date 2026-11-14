@@ -160,6 +160,8 @@ export function LocalDoublet({
   onSelectCell: () => void;
 }) {
   const [endpoint, setEndpoint] = useState(api || "");
+  const worker = useRef<Worker | null>(null);
+  useEffect(() => () => worker.current?.terminate(), []);
   const [settings, setSettings] = useState(seed);
   const [mode, setMode] = useState<(typeof modes)[number]>("steady");
   const [runs, setRuns] = useState<Entry[]>([]);
@@ -198,14 +200,14 @@ export function LocalDoublet({
       onChange={(v) => setSettings({ ...settings, [key]: v })}
     />
   );
-  async function execute(demo: boolean) {
+  async function execute(engine: "browser" | "example" | "darts") {
     setBusy(true);
     setError("");
     try {
-      if (demo) {
+      if (engine === "example") {
         const entries = await Promise.all(
           modes.map(async (name) => {
-            const res = await fetch("/data/doublet-" + name + ".json.gz");
+            const res = await fetch((process.env.NEXT_PUBLIC_BASE_PATH || "") + "/data/doublet-" + name + ".json.gz");
             if (!res.ok || !res.body)
               throw new Error("Could not load the Gassum example.");
             const run = (await new Response(
@@ -223,6 +225,16 @@ export function LocalDoublet({
         setIndex(0);
         setCapital(entries[0].capex);
       } else {
+        let data: Run;
+        if (engine === "browser") {
+          data = await new Promise<Run>((resolve,reject)=>{
+            const task = new Worker((process.env.NEXT_PUBLIC_BASE_PATH || "") + "/doublet-worker.mjs", {type:"module"});
+            worker.current = task;
+            task.onmessage = ({data})=>data.error ? reject(new Error(data.error)) : resolve(data.result);
+            task.onerror = ()=>reject(new Error("Could not start the browser solver. Reload and retry."));
+            task.postMessage(settings);
+          });
+        } else {
         const url = new URL(endpoint);
         if (url.protocol !== "https:" && !(url.protocol === "http:" && ["localhost","127.0.0.1"].includes(url.hostname)))
           throw new Error("Use an HTTPS solver address or a local workstation address.");
@@ -233,17 +245,19 @@ export function LocalDoublet({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(settings),
         });
-        const data = (await res.json()) as Run & {
+        const response = (await res.json()) as Run & {
           detail?: string | { msg: string }[];
         };
         if (!res.ok)
           throw new Error(
-            typeof data.detail === "string"
-              ? data.detail
-              : data.detail?.[0]?.msg || "Run failed.",
+            typeof response.detail === "string"
+              ? response.detail
+              : response.detail?.[0]?.msg || "Run failed.",
           );
+        data = response;
+        }
         const prior = runs.filter((r) => r.site === site);
-        setRuns([...prior, { name: mode, run: data, capex, site }]);
+        setRuns([...prior, { name: mode + (engine === "browser" ? " · 2D screening" : " · open-DARTS"), run: data, capex, site }]);
         setIndex(prior.length);
         if (!prior.length) setCapital(capex);
       }
@@ -255,6 +269,8 @@ export function LocalDoublet({
           : String(e),
       );
     } finally {
+      worker.current?.terminate();
+      worker.current = null;
       setBusy(false);
     }
   }
@@ -282,7 +298,7 @@ export function LocalDoublet({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          void execute(false);
+          void execute("browser");
         }}
       >
         <h3>Local grid and reservoir</h3>
@@ -320,17 +336,20 @@ export function LocalDoublet({
           Each season spans half a year. The pressure window is split equally
           about initial hydrostatic pressure. Wells snap to local cell centres.
         </p>
-        <h3>Calculation service</h3>
+        <h3>Run scenarios</h3>
+        <p>2D screening calculates the cold front on this device. Open-DARTS is available as an optional external solver.</p>
+        <details><summary>Optional open-DARTS service</summary>
         <label>open-DARTS API URL
           <input type="url" placeholder="https://your-solver.example.org" value={endpoint}
             onChange={e=>{setEndpoint(e.target.value);sessionStorage.setItem("doublet-solver-url", e.target.value);}} />
         </label>
-        {!endpoint.trim() && <p>Load the Gassum example below, or enter a running open-DARTS service URL to simulate this cell. The hosted site has no shared solver connected.</p>}
+        </details>
         <div className="doublet-actions">
-          {endpoint.trim() && <button disabled={busy}>
+          <button disabled={busy}>{busy ? "Calculating…" : "Run 2D screening in browser"}</button>
+          {endpoint.trim() && <button type="button" disabled={busy} onClick={()=>execute("darts")}>
             {busy ? "Working…" : "Run open-DARTS"}
           </button>}
-          <button type="button" disabled={busy} onClick={() => execute(true)}>
+          <button type="button" disabled={busy} onClick={() => execute("example")}>
             Load Gassum example · 3 scenarios
           </button>
         </div>

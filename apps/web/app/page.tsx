@@ -98,9 +98,9 @@ export default function Home() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/data/model-preview.json").then((r) => r.json() as Promise<Model>),
-      fetch("/data/pythermogis-preview.json").then((r) => r.json() as Promise<ThermoModel>),
-      fetch("/data/cultural-data.json").then((r) => r.json() as Promise<CulturalData>),
+      fetch((process.env.NEXT_PUBLIC_BASE_PATH || "") + "/data/model-preview.json").then((r) => r.json() as Promise<Model>),
+      fetch((process.env.NEXT_PUBLIC_BASE_PATH || "") + "/data/pythermogis-preview.json").then((r) => r.json() as Promise<ThermoModel>),
+      fetch((process.env.NEXT_PUBLIC_BASE_PATH || "") + "/data/cultural-data.json").then((r) => r.json() as Promise<CulturalData>),
     ]).then(([geology, thermo, cultural]) => {
       setModel(geology); setThermoModel(thermo); setCulturalData(cultural);
       const initial = geology.reservoirs.find((r) => r.id === "gassum")!;

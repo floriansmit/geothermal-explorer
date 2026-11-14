@@ -1,7 +1,7 @@
 // Run: node benchmarks/gassum-doublet.mjs
 import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
-import {simulateScreening} from '../apps/web/lib/doublet-screening.mjs';
+import {simulateScreening} from '../apps/web/public/doublet-screening.mjs';
 
 for (const name of ['steady','seasonal','higher','400m','600m']) {
   const path=new URL(name.endsWith('m') ? './gassum-'+name+'.json.gz' : '../apps/web/public/data/doublet-'+name+'.json.gz',import.meta.url);

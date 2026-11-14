@@ -119,8 +119,8 @@ export function simulateScreening(c) {
     // Estimate thermal expansion from a freshwater density correlation (°C).
     const reservoirT = c.temperature-cooling[prod];
     const pressureHeating = kelvinPerBar(reservoirT)*(drawdown+pressure[prod]*barPerPotential);
-    history.push({day:hours/24,rate,temperature:reservoirT+pressureHeating,deltaP});
+    history.push({day:hours/24,rate,temperature:reservoirT+pressureHeating,deltaP,injectionPressure:initialPressure+injectionHead,productionPressure:initialPressure-drawdown});
     if (season%2) frames.push(cooling.slice());
   }
-  return {frames,history};
+  return {frames,history,wells};
 }

@@ -49,7 +49,7 @@ export function Geology3DViewer({ reservoirs, dataReservoirs, activeId, selected
   const [layersExpanded, setLayersExpanded] = useState(false);
   const [visible, setVisible] = useState<Set<string>>(() => new Set([activeId]));
 
-  useEffect(() => { fetch("/data/architecture-3d.json").then((response) => response.json() as Promise<Architecture>).then(setArchitecture); }, []);
+  useEffect(() => { fetch((process.env.NEXT_PUBLIC_BASE_PATH || "") + "/data/architecture-3d.json").then((response) => response.json() as Promise<Architecture>).then(setArchitecture); }, []);
   useEffect(() => { setVisible((current) => new Set([...current, activeId])); }, [activeId]);
   useEffect(() => {
     const element = containerRef.current;
