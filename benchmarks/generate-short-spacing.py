@@ -1,4 +1,5 @@
-"""Regenerate the 400 m holdout using the same settings as the steady reference."""
+"""Regenerate the short-spacing references using the same settings as the steady reference."""
+import argparse
 import gzip
 import json
 import os
@@ -13,9 +14,12 @@ from apps.doublet.model import Case, simulate
 
 source = root / "apps/web/public/data/doublet-steady.json.gz"
 reference = json.loads(gzip.decompress(source.read_bytes()))
-case = Case(**{**reference["case"], "spacing": 400})
+parser = argparse.ArgumentParser()
+parser.add_argument("--spacing", type=int, choices=(400, 600), default=400)
+spacing = parser.parse_args().spacing
+case = Case(**{**reference["case"], "spacing": spacing})
 with tempfile.TemporaryDirectory() as directory:
     result = simulate(case, Path(directory))
 result["capex"] = reference["capex"]
-target = Path(__file__).with_name("gassum-400m.json.gz")
+target = Path(__file__).with_name(f"gassum-{spacing}m.json.gz")
 target.write_bytes(gzip.compress(json.dumps(result, separators=(",", ":")).encode(), mtime=0))
