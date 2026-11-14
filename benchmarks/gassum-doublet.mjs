@@ -3,8 +3,8 @@ import {readFileSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import {simulateScreening} from '../apps/web/lib/doublet-screening.mjs';
 
-for (const name of ['steady','seasonal','higher']) {
-  const path=new URL('../apps/web/public/data/doublet-'+name+'.json.gz',import.meta.url);
+for (const name of ['steady','seasonal','higher','400m']) {
+  const path=new URL(name === '400m' ? './gassum-400m.json.gz' : '../apps/web/public/data/doublet-'+name+'.json.gz',import.meta.url);
   const reference=JSON.parse(gunzipSync(readFileSync(path)));
   const model=simulateScreening(reference.case);
   let hours=0, volume=0, predictedVolume=0, tempErr=0, pressureErr=0;
@@ -52,7 +52,7 @@ for (const name of ['steady','seasonal','higher']) {
     areas=[refArea,predArea].map(v=>v*reference.case.resolution**2/1e6);
   }
   console.log(name,JSON.stringify({meanRates:[volume/hours,predictedVolume/hours],
-    npvMillionEuro:[referenceNpv,candidateNpv],pressureRmse:Math.sqrt(pressureErr/hours),maxYearEndProducerError:tempErr,
+    finalProducerC:[reference.history.at(-1)[1]-273.15,model.history.at(-1).temperature],npvMillionEuro:[referenceNpv,candidateNpv],pressureRmse:Math.sqrt(pressureErr/hours),maxYearEndProducerError:tempErr,
     annualFieldRmse:Math.sqrt(fieldSum/(model.frames.length*reference.n**2)),maxCellError,
     finalColdAreaKm2:areas,finalPlumeIoU:intersection/union,breakthroughYears:[referenceBreak,candidateBreak]}));
 }
