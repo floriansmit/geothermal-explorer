@@ -16,7 +16,9 @@ from .model import Case
 app = FastAPI(title="Geothermal Explorer local doublet")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173",
+                   "https://decode-geothermal-explorer.floriansmit88.chatgpt.site",
+                   *filter(None, (s.strip() for s in os.getenv("DOUBLET_ALLOWED_ORIGINS", "").split(",")))],
     allow_methods=["POST"],
     allow_headers=["Content-Type"],
 )

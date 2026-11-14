@@ -89,3 +89,12 @@
 .doublet-map small {top:4px;right:4px;}
 .doublet-dialog table {width:100%;font-size:.8rem;text-align:left;}
 .doublet-dialog th,.doublet-dialog td {padding:6px 2px;border-bottom:1px solid #cddbd9;}
+
+
+.simulator-workspace {grid-column:1/-1; min-width:0; overflow:auto; padding:clamp(10px,2vw,24px);}
+.simulator-workspace .doublet-dialog {width:100%; max-width:1080px; max-height:none; overflow:visible;}
+@media(max-width:720px){
+  .app-shell .topbar {height:auto;min-height:64px;flex-wrap:wrap;padding:8px 14px;row-gap:6px;}
+  .app-shell .workspace-switch {position:static;transform:none;flex-basis:100%;margin:0;}
+  .workspace-switch button {flex:1;justify-content:center;white-space:nowrap;}
+}

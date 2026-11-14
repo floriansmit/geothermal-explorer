@@ -70,7 +70,7 @@ function defaults(point: Point | null, thermo: ThermoPoint | null = null): CalcI
 }
 
 export default function Home() {
-  const [workspace, setWorkspace] = useState<"demo" | "build">("demo");
+  const [workspace, setWorkspace] = useState<"demo" | "build" | "simulator">("demo");
   const [model, setModel] = useState<Model | null>(null);
   const [thermoModel, setThermoModel] = useState<ThermoModel | null>(null);
   const [culturalData, setCulturalData] = useState<CulturalData | null>(null);
@@ -92,7 +92,6 @@ export default function Home() {
   const [searching, setSearching] = useState(false);
   const [searchMessage, setSearchMessage] = useState("");
   const [focusLocation, setFocusLocation] = useState<{ lon: number; lat: number; label: string; zoom: number } | null>(null);
-  const [localOpen, setLocalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
   const searchCache = useRef(new globalThis.Map<string, SearchResult[]>());
   const lastSearch = useRef(0);
@@ -224,11 +223,16 @@ export default function Home() {
     <header className="topbar">
       <a className="ggs-return" href="https://www.greengrowthscientific.com/" aria-label="Return to the Green Growth Scientific website">← GGS site</a>
       <div className="brand-mark"><Layers3 /></div><div><h1>DECODE</h1><p>Regional geothermal explorer</p></div>
-      <div className="workspace-switch" role="group" aria-label="Workspace"><button className={workspace === "demo" ? "active" : ""} onClick={() => setWorkspace("demo")}><MapIcon /> Demo</button><button className={workspace === "build" ? "active" : ""} onClick={() => setWorkspace("build")}><Box /> Build Model</button></div>
+      <div className="workspace-switch" role="group" aria-label="Workspace"><button className={workspace === "demo" ? "active" : ""} onClick={() => setWorkspace("demo")}><MapIcon /> Demo</button><button className={workspace === "build" ? "active" : ""} onClick={() => setWorkspace("build")}><Box /> Build Model</button><button className={workspace === "simulator" ? "active" : ""} aria-pressed={workspace === "simulator"} onClick={() => setWorkspace("simulator")}><Waves /> Doublet simulator</button></div>
       <div className="topbar-status"><span className="status-dot" /> Well-conditioned first pass <span className="topbar-divider" /> EPSG:23032</div>
     </header>
 
-    {workspace === "build" ? <ModelBuilder /> : <>
+    {workspace === "simulator" ? <div className="simulator-workspace">{selected?.valid_mask && reservoir?.assessment_type === "deep_geothermal" ? <LocalDoublet site={reservoir.name+" · "+selected.lat+"° N, "+selected.lon+"° E"} capex={selectedThermo?.capex_p50 ?? 10} onSelectCell={()=>{setWorkflow("geology"); setWorkspace("demo");}} seed={{
+            depth:selected.top_depth, thickness:calc.thickness*calc.ntg, porosity:selected.porosity,
+            permeability:calc.permeability, temperature:selected.temperature, injection:calc.injectionTemperature,
+            pressure_window:calc.pressure, spacing:calc.spacing, extent:5000, resolution:50, azimuth:90,
+            years:30, winter:selectedThermo?.flow_rate_p50 ?? results.flow, summer:selectedThermo?.flow_rate_p50 ?? results.flow,
+          }}/> : <section className="doublet-dialog"><h2>Doublet simulator</h2><p>Select a valid deep geothermal reservoir cell to initialise the model.</p><button onClick={()=>{setWorkflow("geology");setWorkspace("demo");}}>Select reservoir cell</button></section>}</div> : workspace === "build" ? <ModelBuilder /> : <>
 
     <aside className="control-panel">
       <Tabs value={workflow} onValueChange={(value) => { const next = value as "geology" | "pythermogis" | "doublet" | "market"; setWorkflow(next); if (next === "doublet" || next === "market") setViewMode("2d"); if (next === "market") { setThermoProperty("power"); setPercentile(50); } }} className="sidebar-tabs">
@@ -284,13 +288,6 @@ export default function Home() {
           </div>
           <button className="reset-button" onClick={() => setCalc(defaults(selected, selectedThermo))}><RotateCcw /> Reset to PyThermoGIS P50</button>
           <div className="calc-results"><p className="eyebrow">Screening result</p><Result label="Flow rate" value={results.flow.toFixed(0)} unit="m³/h" /><Result label="Thermal power" value={results.thermal.toFixed(1)} unit="MWth" featured /><Result label="Pump power" value={results.pumping.toFixed(2)} unit="MWe" /><Result label="Net reservoir" value={results.netH.toFixed(1)} unit="m" /></div>
-          <button className="reset-button" disabled={!selected?.valid_mask || reservoir?.assessment_type !== "deep_geothermal"} onClick={()=>setLocalOpen(true)}>Create local doublet model</button>
-          {localOpen && selected && reservoir && <LocalDoublet site={reservoir.name+" · "+selected.lat+"° N, "+selected.lon+"° E"} capex={selectedThermo?.capex_p50 ?? 10} onClose={()=>setLocalOpen(false)} seed={{
-            depth:selected.top_depth, thickness:calc.thickness*calc.ntg, porosity:selected.porosity,
-            permeability:calc.permeability, temperature:selected.temperature, injection:calc.injectionTemperature,
-            pressure_window:calc.pressure, spacing:calc.spacing, extent:5000, resolution:50, azimuth:90,
-            years:30, winter:selectedThermo?.flow_rate_p50 ?? results.flow, summer:selectedThermo?.flow_rate_p50 ?? results.flow,
-          }}/>}
           <p className="calc-caveat">The baseline is the completed stochastic grid run. Edited values use the browser’s analytical radial-flow response for immediate sensitivity screening.</p>
         </TabsContent>
         <TabsContent value="market" className="sidebar-tab-content">

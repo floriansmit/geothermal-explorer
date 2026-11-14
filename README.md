@@ -142,7 +142,7 @@ GitHub Actions runs the public Python tests and frontend production build. Tests
 
 The GGS and ChatGPT-hosted frontends display precomputed PyThermoGIS maps. Edits in DoubletCalc1D recalculate a radial-flow sensitivity in the browser. Neither host includes the Python/Java PyThermoGIS engine. To calculate new PyThermoGIS results, use **Build Model** with a reachable PyThermoGIS API (the local setup defaults to port 8000).
 
-To view the cold front on the ChatGPT site, open **Demo → DoubletCalc1D**, select a valid deep-reservoir cell such as Gassum, then scroll past **Screening result** and choose **Create local doublet model → Load Gassum example · 3 scenarios**. The example uses one fixed site. Custom simulations for the selected cell require the separate open-DARTS service on port 8001. Changing tariffs or demand recalculates cash flow in the browser.
+To view the cold front on the ChatGPT site, open the top-level **Doublet simulator** tab and choose **Load Gassum example · 3 scenarios**. The example uses one fixed site. Custom simulations for the selected cell require the separate open-DARTS service on port 8001. Changing tariffs or demand recalculates cash flow in the browser.
 
 GitHub CI tests and builds the frontend on merge. Publishing the ChatGPT site is a separate release step: sync the merged frontend and bundled example files to the existing Sites project, build it, and deploy the saved version.
 
@@ -154,7 +154,7 @@ No licence is granted for third-party geological deliveries, well data, cultural
 
 ## Local doublet simulation
 
-In **Demo → DoubletCalc1D**, select a deep-reservoir cell on the map and choose **Create local doublet model**. The geology and adjusted doublet inputs initialise a uniform single-layer grid centred on that location. The domain width and cell size are independent of the regional map spacing. Azimuth is clockwise from north from injector to producer. Compare schedules with all other settings held fixed. The hosted example replays three real 30-year open-DARTS runs at the same Gassum site (56.864221° N, 10.081209° E), on a 100 × 100 grid with 50 m cells and 1.2 km well spacing.
+Select a deep-reservoir cell in **Demo** and open the top-level **Doublet simulator** tab. **Change map cell** returns to the regional map. The geology and adjusted doublet inputs initialise a uniform single-layer grid centred on that location. The domain width and cell size are independent of the regional map spacing. Azimuth is clockwise from north from injector to producer. Compare schedules with all other settings held fixed. The hosted example replays three real 30-year open-DARTS runs at the same Gassum site (56.864221° N, 10.081209° E), on a 100 × 100 grid with 50 m cells and 1.2 km well spacing.
 
 For custom runs, start the existing local website and launch the optional solver in a separate terminal from the repository root. Use a separate Python 3.12 environment for DARTS and its scientific dependencies:
 
@@ -168,5 +168,7 @@ On Windows run:
 On Linux run:
 
     .venv-doublet/bin/python -m uvicorn apps.doublet.server:app --host 127.0.0.1 --port 8001
+
+To submit a case from the hosted tab, enter the reachable HTTPS base URL of your running solver under **Calculation service** and choose **Run open-DARTS**. The browser sends the case directly to that service. The ChatGPT Site origin is allowed by the solver; set `DOUBLET_ALLOWED_ORIGINS` to a comma-separated list for additional frontend origins. The example works without a service. The local frontend defaults to `http://127.0.0.1:8001`.
 
 Each run uses an isolated worker and temporary output directory. Cold-front maps are saved annually. Well pressure, temperature and achieved rate are integrated over solver time steps. Heat sales are capped by the editable demand assumption. Discounted operating cash flows use year-end discounting and upfront CAPEX. Wellbore/surface losses, brine salinity, vertical heat recharge and sub-grid heterogeneity are outside this first screening case. The independent DoubletCalc2D benchmark is pending.

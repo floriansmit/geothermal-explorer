@@ -152,14 +152,14 @@ export function LocalDoublet({
   seed,
   site,
   capex,
-  onClose,
+  onSelectCell,
 }: {
   seed: Case;
   site: string;
   capex: number;
-  onClose: () => void;
+  onSelectCell: () => void;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
+  const [endpoint, setEndpoint] = useState(api || "");
   const [settings, setSettings] = useState(seed);
   const [mode, setMode] = useState<(typeof modes)[number]>("steady");
   const [runs, setRuns] = useState<Entry[]>([]);
@@ -177,7 +177,10 @@ export function LocalDoublet({
   const active = runs[index];
   const yr = active ? Math.min(year, active.run.case.years) : 0;
   useEffect(() => {
-    dialog.current?.showModal();
+    const saved = sessionStorage.getItem("doublet-solver-url");
+    if (saved) setEndpoint(saved);
+    else if (!api && ["localhost", "127.0.0.1"].includes(window.location.hostname))
+      setEndpoint("http://127.0.0.1:8001");
   }, []);
   useEffect(() => {
     if (!playing || !active) return;
@@ -220,7 +223,11 @@ export function LocalDoublet({
         setIndex(0);
         setCapital(entries[0].capex);
       } else {
-        const base = api || "http://127.0.0.1:8001";
+        const url = new URL(endpoint);
+        if (url.protocol !== "https:" && !(url.protocol === "http:" && ["localhost","127.0.0.1"].includes(url.hostname)))
+          throw new Error("Use an HTTPS solver address or a local workstation address.");
+        if (url.username || url.password || url.search || url.hash) throw new Error("Enter the base URL without credentials, a query or a fragment.");
+        const base = url.href.replace(/\/+$/, "");
         const res = await fetch(base + "/v1/doublet/run", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -244,7 +251,7 @@ export function LocalDoublet({
     } catch (e) {
       setError(
         e instanceof TypeError
-          ? "Could not reach the doublet service. Start the workstation solver and retry."
+          ? "Could not reach the solver. Check its URL, network access and allowed website origins."
           : String(e),
       );
     } finally {
@@ -259,20 +266,16 @@ export function LocalDoublet({
       summer: seed.winter * (m === "seasonal" ? 0.6 : m === "higher" ? 1.4 : 1),
     });
   };
-  const local =
-    !!api ||
-    (typeof window !== "undefined" &&
-      ["localhost", "127.0.0.1"].includes(window.location.hostname));
   const comparisons = runs.map((r) =>
     cash(r.run, capital, tariff, electricity, fixed, discount, demand),
   );
   const row = yr ? comparisons[index].rows[yr - 1] : null;
   return (
-    <dialog ref={dialog} className="doublet-dialog" onCancel={onClose}>
+    <section className="doublet-dialog">
       <header>
-        <h2>Local doublet simulation</h2>
-        <button onClick={onClose} aria-label="Close simulation">
-          Close ×
+        <h2>Doublet simulator</h2>
+        <button onClick={onSelectCell} type="button">
+          Change map cell
         </button>
       </header>
       <p>{site} · Uniform reservoir properties across the local grid.</p>
@@ -317,20 +320,20 @@ export function LocalDoublet({
           Each season spans half a year. The pressure window is split equally
           about initial hydrostatic pressure. Wells snap to local cell centres.
         </p>
+        <h3>Calculation service</h3>
+        <label>open-DARTS API URL
+          <input type="url" placeholder="https://your-solver.example.org" value={endpoint}
+            onChange={e=>{setEndpoint(e.target.value);sessionStorage.setItem("doublet-solver-url", e.target.value);}} />
+        </label>
+        {!endpoint.trim() && <p>Load the Gassum example below, or enter a running open-DARTS service URL to simulate this cell. The hosted site has no shared solver connected.</p>}
         <div className="doublet-actions">
-          <button disabled={!local || busy}>
+          {endpoint.trim() && <button disabled={busy}>
             {busy ? "Working…" : "Run open-DARTS"}
-          </button>
+          </button>}
           <button type="button" disabled={busy} onClick={() => execute(true)}>
             Load Gassum example · 3 scenarios
           </button>
         </div>
-        {!local && (
-          <p>
-            Custom runs use the workstation solver. The example replays saved
-            open-DARTS runs at a fixed Gassum location.
-          </p>
-        )}
         {error && <p role="alert">{error}</p>}
       </form>
       {active && (
@@ -518,6 +521,6 @@ export function LocalDoublet({
           </p>
         </section>
       )}
-    </dialog>
+    </section>
   );
 }
