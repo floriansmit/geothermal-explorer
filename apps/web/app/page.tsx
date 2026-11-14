@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, Box, Building2, Calculator, Database, Factory, Flame, Layers3, LoaderCircle, LockKeyhole, Map as MapIcon, MapPin, Mountain, RotateCcw, Search, Sigma, Waves } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Geology3DViewer } from "@/components/geology-3d-viewer";
+import { LocalDoublet } from "@/components/local-doublet";
 import { ModelBuilder } from "@/components/model-builder";
 import { CulturalData, GeothermalMap } from "@/components/geothermal-map";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -91,6 +92,7 @@ export default function Home() {
   const [searching, setSearching] = useState(false);
   const [searchMessage, setSearchMessage] = useState("");
   const [focusLocation, setFocusLocation] = useState<{ lon: number; lat: number; label: string; zoom: number } | null>(null);
+  const [localOpen, setLocalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
   const searchCache = useRef(new globalThis.Map<string, SearchResult[]>());
   const lastSearch = useRef(0);
@@ -282,6 +284,13 @@ export default function Home() {
           </div>
           <button className="reset-button" onClick={() => setCalc(defaults(selected, selectedThermo))}><RotateCcw /> Reset to PyThermoGIS P50</button>
           <div className="calc-results"><p className="eyebrow">Screening result</p><Result label="Flow rate" value={results.flow.toFixed(0)} unit="m³/h" /><Result label="Thermal power" value={results.thermal.toFixed(1)} unit="MWth" featured /><Result label="Pump power" value={results.pumping.toFixed(2)} unit="MWe" /><Result label="Net reservoir" value={results.netH.toFixed(1)} unit="m" /></div>
+          <button className="reset-button" disabled={!selected?.valid_mask || reservoir?.assessment_type !== "deep_geothermal"} onClick={()=>setLocalOpen(true)}>Create local doublet model</button>
+          {localOpen && selected && reservoir && <LocalDoublet site={reservoir.name+" · "+selected.lat+"° N, "+selected.lon+"° E"} capex={selectedThermo?.capex_p50 ?? 10} onClose={()=>setLocalOpen(false)} seed={{
+            depth:selected.top_depth, thickness:calc.thickness*calc.ntg, porosity:selected.porosity,
+            permeability:calc.permeability, temperature:selected.temperature, injection:calc.injectionTemperature,
+            pressure_window:calc.pressure, spacing:calc.spacing, extent:5000, resolution:50, azimuth:90,
+            years:30, winter:selectedThermo?.flow_rate_p50 ?? results.flow, summer:selectedThermo?.flow_rate_p50 ?? results.flow,
+          }}/>}
           <p className="calc-caveat">The baseline is the completed stochastic grid run. Edited values use the browser’s analytical radial-flow response for immediate sensitivity screening.</p>
         </TabsContent>
         <TabsContent value="market" className="sidebar-tab-content">

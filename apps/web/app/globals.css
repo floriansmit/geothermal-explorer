@@ -69,3 +69,23 @@
 .ggs-return{display:inline-flex;align-items:center;min-height:34px;padding:0 11px;border:1px solid #46515d;color:#ddd9ce;background:#202630;text-decoration:none;font-size:.7rem;font-weight:700;white-space:nowrap}
 .ggs-return:hover,.ggs-return:focus-visible{color:#171711;background:#e4c66f;border-color:#e4c66f;outline:none}
 @media(max-width:430px){.topbar{gap:8px;padding-inline:10px}.ggs-return{padding-inline:8px}.brand-mark{display:none}.topbar>div:nth-of-type(2) p{display:none}}
+
+.doublet-dialog { margin:auto; width:min(900px,95vw); max-height:90dvh; overflow:auto; padding:clamp(16px,3vw,32px); border:1px solid #adc2bf; border-radius:12px; background:#fbfcfa; color:#163b3d; }
+.doublet-dialog::backdrop {background:#11272dc2;}
+.doublet-dialog header,.doublet-actions {display:flex; align-items:center; gap:12px; justify-content:space-between; flex-wrap:wrap;}
+.doublet-dialog h2 {font-size:1.5rem;font-weight:650;}
+.doublet-dialog h3 {font-size:1.05rem; font-weight:650; margin:18px 0 9px;}
+.doublet-dialog p {font-size:.85rem; margin:9px 0; line-height:1.5;}
+.doublet-fields {display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;}
+.doublet-dialog label {display:grid;gap:3px; font-size:.8rem;}
+.doublet-dialog input,.doublet-dialog select {padding:6px;border:1px solid #b3c5c2;border-radius:4px; background:white; min-width:0;}
+.doublet-dialog button {padding:7px 12px;border-radius:6px;background:#195a58;color:white;}
+.doublet-dialog button:disabled {opacity:.55;}
+.doublet-results {display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px;margin-top:12px;}
+.doublet-map {position:relative;aspect-ratio:1;background:#efd08f;}
+.doublet-map canvas {width:100%;height:100%;image-rendering:pixelated;}
+.doublet-map span,.doublet-map small {position:absolute;background:#fff;color:#172f35;padding:1px 4px;font-weight:bold;}
+.doublet-map span {transform:translate(-50%,-50%);border:1px solid;border-radius:3px;font-size:.7rem;}
+.doublet-map small {top:4px;right:4px;}
+.doublet-dialog table {width:100%;font-size:.8rem;text-align:left;}
+.doublet-dialog th,.doublet-dialog td {padding:6px 2px;border-bottom:1px solid #cddbd9;}
