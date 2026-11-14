@@ -86,6 +86,8 @@ export default function Home() {
   const [showHeatDelivery, setShowHeatDelivery] = useState(true);
   const [showIndustry, setShowIndustry] = useState(true);
   const [showHeatPlants, setShowHeatPlants] = useState(true);
+  const [cellActions, setCellActions] = useState(false);
+  const [spacingOverride, setSpacingOverride] = useState<number | null>(null);
   const [calc, setCalc] = useState<CalcInputs>(defaults(null));
   const [address, setAddress] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -107,7 +109,7 @@ export default function Home() {
       const point = initial.points[Math.floor(initial.points.length / 2)];
       const thermoReservoir = thermo.reservoirs.find((r) => r.id === "gassum");
       const thermoPoint = thermoReservoir?.points[Math.floor(thermoReservoir.points.length / 2)] ?? null;
-      setSelected(point); setSelectedThermo(thermoPoint); setCalc(defaults(point, thermoPoint));
+      setSelected(point); setSelectedThermo(thermoPoint); setSpacingOverride(null); setCalc(defaults(point, thermoPoint));
     });
   }, []);
 
@@ -159,7 +161,7 @@ export default function Home() {
     setReservoirId(id);
     const next = model?.reservoirs.find((r) => r.id === id);
     const nextThermo = thermoModel?.reservoirs.find((r) => r.id === id);
-    if (next) { const point = next.points[Math.floor(next.points.length / 2)], thermoPoint = nextThermo?.points[Math.floor(nextThermo.points.length / 2)] ?? null; setSelected(point); setSelectedThermo(thermoPoint); setCalc(defaults(point, thermoPoint)); }
+    if (next) { const point = next.points[Math.floor(next.points.length / 2)], thermoPoint = nextThermo?.points[Math.floor(nextThermo.points.length / 2)] ?? null; setSelected(point); setSelectedThermo(thermoPoint); setSpacingOverride(null); setCalc(defaults(point, thermoPoint)); }
   };
   const nearestThermoPoint = (point: { lon: number; lat: number }) => {
     if (!thermoReservoir) return null;
@@ -173,8 +175,8 @@ export default function Home() {
     for (const candidate of reservoir.points) { const d = (candidate.lon - point.lon) ** 2 + (candidate.lat - point.lat) ** 2; if (d < distance) { nearest = candidate; distance = d; } }
     return nearest;
   };
-  const selectPoint = (point: Point) => { const thermoPoint = nearestThermoPoint(point); setSelected(point); setSelectedThermo(thermoPoint); setCalc(defaults(point, thermoPoint)); };
-  const selectThermoPoint = (point: ThermoPoint) => { const geologyPoint = nearestGeologyPoint(point); setSelectedThermo(point); setSelected(geologyPoint); setCalc(defaults(geologyPoint, point)); };
+  const selectPoint = (point: Point) => { const thermoPoint = nearestThermoPoint(point); setSelected(point); setSelectedThermo(thermoPoint); setSpacingOverride(null); setCalc(defaults(point, thermoPoint)); };
+  const selectThermoPoint = (point: ThermoPoint) => { const geologyPoint = nearestGeologyPoint(point); setSelectedThermo(point); setSelected(geologyPoint); setSpacingOverride(null); setCalc(defaults(geologyPoint, point)); };
   const searchAddress = async (event: FormEvent) => {
     event.preventDefault();
     const query = address.trim();
@@ -230,7 +232,7 @@ export default function Home() {
     {workspace === "simulator" ? <div className="simulator-workspace">{selected?.valid_mask && reservoir?.assessment_type === "deep_geothermal" ? <LocalDoublet site={reservoir.name+" · "+selected.lat+"° N, "+selected.lon+"° E"} capex={selectedThermo?.capex_p50 ?? 10} onSelectCell={()=>{setWorkflow("geology"); setWorkspace("demo");}} seed={{
             depth:selected.top_depth, thickness:calc.thickness*calc.ntg, porosity:selected.porosity,
             permeability:calc.permeability, temperature:selected.temperature, injection:calc.injectionTemperature,
-            pressure_window:calc.pressure, spacing:calc.spacing, extent:5000, resolution:50, azimuth:90,
+            pressure_window:calc.pressure, spacing:spacingOverride ?? 1250, extent:5000, resolution:50, azimuth:90,
             years:30, winter:selectedThermo?.flow_rate_p50 ?? results.flow, summer:selectedThermo?.flow_rate_p50 ?? results.flow,
           }}/> : <section className="doublet-dialog"><h2>Doublet simulator</h2><p>Select a valid deep geothermal reservoir cell to initialise the model.</p><button onClick={()=>{setWorkflow("geology");setWorkspace("demo");}}>Select reservoir cell</button></section>}</div> : workspace === "build" ? <ModelBuilder /> : <>
 
@@ -283,10 +285,10 @@ export default function Home() {
             <CalcField label="Net-to-gross" unit="fraction" value={calc.ntg} step={.01} setValue={(v) => setCalc({ ...calc, ntg: v })} />
             <CalcField label="Production temperature" unit="°C" value={calc.temperature} step={.1} setValue={(v) => setCalc({ ...calc, temperature: v })} />
             <CalcField label="Injection temperature" unit="°C" value={calc.injectionTemperature} setValue={(v) => setCalc({ ...calc, injectionTemperature: v })} />
-            <CalcField label="Well spacing" unit="m" value={calc.spacing} setValue={(v) => setCalc({ ...calc, spacing: v })} />
+            <CalcField label="Well spacing" unit="m" value={calc.spacing} setValue={(v) => {setSpacingOverride(v);setCalc({ ...calc, spacing: v });}} />
             <CalcField label="Pressure window" unit="bar" value={calc.pressure} setValue={(v) => setCalc({ ...calc, pressure: v })} />
           </div>
-          <button className="reset-button" onClick={() => setCalc(defaults(selected, selectedThermo))}><RotateCcw /> Reset to PyThermoGIS P50</button>
+          <button className="reset-button" onClick={() => {setSpacingOverride(null); setCalc(defaults(selected, selectedThermo));}}><RotateCcw /> Reset to PyThermoGIS P50</button>
           <div className="calc-results"><p className="eyebrow">Screening result</p><Result label="Flow rate" value={results.flow.toFixed(0)} unit="m³/h" /><Result label="Thermal power" value={results.thermal.toFixed(1)} unit="MWth" featured /><Result label="Pump power" value={results.pumping.toFixed(2)} unit="MWe" /><Result label="Net reservoir" value={results.netH.toFixed(1)} unit="m" /></div>
           <p className="calc-caveat">The baseline is the completed stochastic grid run. Edited values use the browser’s analytical radial-flow response for immediate sensitivity screening.</p>
         </TabsContent>
@@ -312,7 +314,13 @@ export default function Home() {
     <section className="map-panel" aria-label="Regional geothermal model map">
       <div className="map-heading"><div><p>{reservoir?.name ?? "Loading model"}</p><h2>{showing3d ? workflow === "pythermogis" ? `3D ${thermoProperties[thermoProperty].label} · P${percentile}` : `3D ${properties[property].label}` : mapLabel}</h2></div>{supports3d ? <div className="view-mode-switch" role="group" aria-label="Viewer mode"><button className={viewMode === "2d" ? "active" : ""} onClick={() => setViewMode("2d")}><MapIcon /> 2D map</button><button className={viewMode === "3d" ? "active" : ""} onClick={() => setViewMode("3d")}><Box /> 3D model</button></div> : <Badge variant="outline" className="engine-badge">{thermoModel?.engine ?? "PyThermoGIS"} · P{percentile}</Badge>}<div className="coordinate-readout"><MapPin />{selected ? `${selected.lat.toFixed(4)}° N, ${selected.lon.toFixed(4)}° E` : "Select a grid cell"}</div></div>
       <div className="map-canvas">
-        {!showing3d ? <>{mapPoints && model ? <GeothermalMap points={mapPoints} wells={model.wells} selected={mapSelected} range={mapRange} property={mapProperty} palette={mapPalette} showBasemap={showTopography} focusLocation={focusLocation} cultural={workflow === "market" ? culturalData : null} showDistrictHeating={showDistrictHeating} showHeatDelivery={showHeatDelivery} showIndustry={showIndustry} showHeatPlants={showHeatPlants} onSelect={(point) => showingThermo ? selectThermoPoint(point as ThermoPoint) : selectPoint(point as Point)} /> : <div className="loading-state">Preparing regional model…</div>}
+        {!showing3d ? <>{mapPoints && model ? <GeothermalMap points={mapPoints} wells={model.wells} selected={mapSelected} range={mapRange} property={mapProperty} palette={mapPalette} showBasemap={showTopography} focusLocation={focusLocation} cultural={workflow === "market" ? culturalData : null} showDistrictHeating={showDistrictHeating} showHeatDelivery={showHeatDelivery} showIndustry={showIndustry} showHeatPlants={showHeatPlants} onSelect={(point) => {if(showingThermo) selectThermoPoint(point as ThermoPoint); else selectPoint(point as Point); setCellActions(true);}} /> : <div className="loading-state">Preparing regional model…</div>}
+        {cellActions && selected && <section className="cell-navigation" aria-label="Selected map cell">
+          <strong>{reservoir?.name} · {selected.lat.toFixed(4)}° N, {selected.lon.toFixed(4)}° E</strong>
+          <button aria-label="Dismiss cell options" onClick={()=>setCellActions(false)}>×</button>
+          <div><button disabled={!selected.valid_mask} onClick={()=>{setWorkflow("doublet");setViewMode("2d");setCellActions(false);requestAnimationFrame(()=>document.querySelector(".control-panel")?.scrollIntoView({block:"start"}));}}>Open DoubletCalc1D</button>
+          <button disabled={!selected.valid_mask || reservoir?.assessment_type !== "deep_geothermal"} onClick={()=>{setCellActions(false);setWorkspace("simulator");}}>Open doublet simulation</button></div>
+        </section>}
         <div className="address-search">
           <form onSubmit={searchAddress}><Search /><input value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Search a Danish address or place" aria-label="Search a Danish address or place" /><button disabled={searching || address.trim().length < 3}>{searching ? <LoaderCircle className="search-spinner" /> : "Find"}</button></form>
           {(searchResults.length > 0 || searchMessage) && <div className="search-results">{searchResults.map((result) => <button key={`${result.lat}-${result.lon}`} onClick={() => chooseAddress(result)}><MapPin /><span>{result.display_name}</span></button>)}{searchMessage && <p>{searchMessage}</p>}<small>Search © OpenStreetMap contributors</small></div>}

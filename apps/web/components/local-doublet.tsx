@@ -159,6 +159,9 @@ export function LocalDoublet({
   capex: number;
   onSelectCell: () => void;
 }) {
+  const resultsPanel = useRef<HTMLElement>(null);
+  const [completed, setCompleted] = useState(0);
+  useEffect(()=>{if(completed) resultsPanel.current?.scrollIntoView({block:"start"});},[completed]);
   const [endpoint, setEndpoint] = useState(api || "");
   const worker = useRef<Worker | null>(null);
   useEffect(() => () => worker.current?.terminate(), []);
@@ -201,6 +204,7 @@ export function LocalDoublet({
     />
   );
   async function execute(engine: "browser" | "example" | "darts") {
+    setPlaying(false);
     setBusy(true);
     setError("");
     try {
@@ -261,7 +265,8 @@ export function LocalDoublet({
         setIndex(prior.length);
         if (!prior.length) setCapital(capex);
       }
-      setYear(1);
+      setYear(engine === "example" ? 1 : settings.years);
+      setCompleted(v=>v+1);
     } catch (e) {
       setError(
         e instanceof TypeError
@@ -301,7 +306,7 @@ export function LocalDoublet({
           void execute("browser");
         }}
       >
-        <h3>Local grid and reservoir</h3>
+        <h3>Local grid and reservoir</h3><p>Design spacing starts at 1,250 m unless you enter a spacing in DoubletCalc1D. Wells snap to local cell centres.</p>
         <div className="doublet-fields">
           {field("extent", "Domain width (m)")}
           {field("resolution", "Cell width (m)")}
@@ -356,8 +361,9 @@ export function LocalDoublet({
         {error && <p role="alert">{error}</p>}
       </form>
       {active && (
-        <section>
-          <h3>Simulation results</h3>
+        <section ref={resultsPanel} style={{scrollMarginTop:"80px"}}>
+          <h3>Simulation results · Run {index+1}</h3>
+          <p aria-live="polite">{active.name} · {active.run.case.spacing} m requested spacing · {active.run.case.years} years · NPV <strong>€{comparisons[index].npv.toFixed(2)} M</strong></p>
           <p>
             {active.site} · {active.run.n} × {active.run.n} cells ·{" "}
             {active.run.case.resolution} m resolution
@@ -368,7 +374,7 @@ export function LocalDoublet({
               {runs.map((r, i) => (
                 <option key={i} value={i}>
                   {i + 1}. {r.name} · {r.run.case.winter.toFixed(1)} /{" "}
-                  {r.run.case.summer.toFixed(1)} m³/h
+                  {r.run.case.summer.toFixed(1)} m³/h · {r.run.case.spacing} m
                 </option>
               ))}
             </select>
@@ -429,6 +435,54 @@ export function LocalDoublet({
               )}
             </div>
           </div>
+          <h3>Year-end producer temperature (°C)</h3>
+          <svg
+            viewBox="0 0 600 115"
+            width="100%"
+            role="img"
+            aria-label="Year-end producer temperature for the displayed scenario"
+          >
+            {(() => {
+              const values = comparisons[index].rows.map((y) => y.temp);
+              const low = Math.min(...values)-0.1,
+                high = Math.max(...values)+0.1;
+              const y = (v: number) =>
+                95 - (80 * (v - low)) / (high - low || 1);
+              const x = (i: number) =>
+                45 + (540 * i) / Math.max(1, values.length - 1);
+              return (
+                <>
+                  <line x1="45" x2="585" y1="95" y2="95" stroke="#aaa" />
+                  <text x="0" y="17" fontSize="12">
+                    {high.toFixed(2)}
+                  </text>
+                  <text x="0" y="95" fontSize="12">
+                    {low.toFixed(2)}
+                  </text>
+                  <polyline
+                    fill="none"
+                    stroke="#a04a30"
+                    strokeWidth="3"
+                    points={values.map((v, i) => x(i) + "," + y(v)).join(" ")}
+                  />
+                  {!!yr && (
+                    <circle
+                      cx={x(yr - 1)}
+                      cy={y(values[yr - 1])}
+                      r="4"
+                      fill="#a84227"
+                    />
+                  )}
+                  <text x="45" y="112" fontSize="12">
+                    Year 1
+                  </text>
+                  <text x="585" y="112" textAnchor="end" fontSize="12">
+                    Year {values.length}
+                  </text>
+                </>
+              );
+            })()}
+          </svg>
           <h3>Annual operating cash flow (M€)</h3>
           <svg
             viewBox="0 0 600 115"
@@ -517,9 +571,9 @@ export function LocalDoublet({
                   (y) => y.temp <= runs[i].run.case.temperature - 1,
                 );
                 return (
-                  <tr key={i}>
+                  <tr key={i} aria-current={i===index ? "true" : undefined} className={i===index ? "displayed-run" : undefined}>
                     <td>
-                      {i + 1}. {runs[i].name}
+                      {i + 1}. {runs[i].name} · {runs[i].run.case.spacing} m
                     </td>
                     <td>{first < 0 ? "Beyond run" : "Year " + (first + 1)}</td>
                     <td>

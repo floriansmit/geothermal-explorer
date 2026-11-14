@@ -98,3 +98,11 @@
   .app-shell .workspace-switch {position:static;transform:none;flex-basis:100%;margin:0;}
   .workspace-switch button {flex:1;justify-content:center;white-space:nowrap;}
 }
+
+.cell-navigation {position:absolute;z-index:4;top:68px;left:12px;max-width:calc(100% - 24px);padding:12px;border:1px solid #52645f;border-radius:6px;background:#172325;color:#eff5f0;box-shadow:0 6px 20px #0005;}
+.cell-navigation strong {font-size:.8rem;margin-right:22px;}
+.cell-navigation>button {position:absolute;top:4px;right:8px;color:inherit;}
+.cell-navigation div {display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.cell-navigation div button {padding:6px 9px;border-radius:3px;background:#cee0d9;color:#133d37;font-size:.8rem;}
+.cell-navigation button:disabled {opacity:.45;}
+.doublet-dialog .displayed-run {background:#e3efe9;}
