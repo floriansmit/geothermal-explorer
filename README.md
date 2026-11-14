@@ -140,7 +140,11 @@ GitHub Actions runs the public Python tests and frontend production build. Tests
 
 ## Deployment boundary
 
-The hosted demonstration uses precomputed outputs and browser-side interactions. The Build Model workflow can prepare inputs online, but executing the real PyThermoGIS engine requires the Python/Java API. A future production deployment can connect the public frontend to an authorised private container endpoint over HTTPS.
+The GGS and ChatGPT-hosted frontends display precomputed PyThermoGIS maps. Edits in DoubletCalc1D recalculate a radial-flow sensitivity in the browser. Neither host includes the Python/Java PyThermoGIS engine. To calculate new PyThermoGIS results, use **Build Model** with a reachable PyThermoGIS API (the local setup defaults to port 8000).
+
+To view the cold front on the ChatGPT site, open **Demo → DoubletCalc1D**, select a valid deep-reservoir cell such as Gassum, then scroll past **Screening result** and choose **Create local doublet model → Load Gassum example · 3 scenarios**. The example uses one fixed site. Custom simulations for the selected cell require the separate open-DARTS service on port 8001. Changing tariffs or demand recalculates cash flow in the browser.
+
+GitHub CI tests and builds the frontend on merge. Publishing the ChatGPT site is a separate release step: sync the merged frontend and bundled example files to the existing Sites project, build it, and deploy the saved version.
 
 See [Architecture](docs/architecture.md) for details.
 
